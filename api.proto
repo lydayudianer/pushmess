@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option java_multiple_files = true; 
+option java_package = "com.xingytech.tczj.pushmess"; 
+option java_outer_classname = "Pushmess"; 
+
+package pmess;
+
+service PmessService {
+	rpc Push (PmessRequest) returns (PmessResponse);
+}
+
+message PmessRequest {
+string oids = 1;
+int32 ptype =2;
+string reqstr=3;
+}
+message PmessResponse {
+string repstr=1;
+}
