@@ -1,10 +1,12 @@
 package huawei
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"jspring.top/pushmess/bmess"
 	"jspring.top/pushmess/config"
+	"jspring.top/pushmess/log"
 	"jspring.top/pushmess/thrift"
 	"net/http"
 	"net/url"
@@ -50,7 +52,7 @@ func Use() bmess.PushHandle {
 		msch:     make(chan *bmess.Mt, 10),
 		pkgName:  config.Cfg.PkgName,
 	}
-	log.Info("huawei is started")
+	log.Log.Info("huawei is started")
 	return pusher
 }
 
@@ -65,14 +67,17 @@ func (p *Pusher) pushauth() {
 		"&client_id=" + p.appid
 	req, err := http.NewRequest("POST", p.tokenurl, strings.NewReader(ctx))
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	client := &http.Client{}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	defer resp.Body.Close()
@@ -85,7 +90,7 @@ func (p *Pusher) pushauth() {
 		}
 		if err != nil {
 			if err.Error() != "EOF" {
-				log.Error(err)
+				log.Log.Error(err)
 			}
 			break
 		}
@@ -93,32 +98,35 @@ func (p *Pusher) pushauth() {
 	ret := make(map[string]interface{})
 	err = json.Unmarshal(resb, &ret)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	if ret["access_token"] != "" {
 		p.authtoken = fmt.Sprintf("%v", ret["access_token"])
-		log.Info("token:", p.authtoken)
+		log.Log.Info("huawei-token:", p.authtoken)
 		expiresIn := fmt.Sprintf("%v", ret["expires_in"])
-		log.Info("expires_in:", expiresIn)
+		log.Log.Info("expires_in:", expiresIn)
 		s, _ := time.ParseDuration(expiresIn + "s")
 		p.tokenExpiredTime = time.Now().Add(s)
 	}
-	log.Info("error:", ret["error"])
-	log.Info("error_description:", ret["error_description"])
+	log.Log.Info("error:", ret["error"])
+	log.Log.Info("error_description:", ret["error_description"])
 }
 
 func (p *Pusher) httpsend(req *http.Request) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	client := &http.Client{}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	defer resp.Body.Close()
-	log.Info("HttpStatus:", resp.StatusCode)
-	log.Info("HttpHeader:", resp.Header["NSP_STATUS"])
+	log.Log.Info("HttpStatus:", resp.StatusCode)
+	log.Log.Info("HttpHeader:", resp.Header["NSP_STATUS"])
 	resb := []byte{}
 	for {
 		buff := make([]byte, 256)
@@ -128,23 +136,23 @@ func (p *Pusher) httpsend(req *http.Request) {
 		}
 		if err != nil {
 			if err.Error() != "EOF" {
-				log.Error(err)
+				log.Log.Error(err)
 			}
 			break
 		}
 	}
 	if len(resb) < 1 {
-		log.Info("无返回内容")
+		log.Log.Info("无返回内容")
 		return
 	}
 	ret := make(map[string]string)
 	err = json.Unmarshal(resb, &ret)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
-	log.Info("code:", ret["code"], " ;msg:", ret["msg"])
-	log.Info("requestId:", ret["requestId"])
+	log.Log.Info("code:", ret["code"], " ;msg:", ret["msg"])
+	log.Log.Info("requestId:", ret["requestId"])
 }
 
 func (p *Pusher) normal(ids []string, reqstr *thrift.Tip) {
@@ -154,7 +162,7 @@ func (p *Pusher) normal(ids []string, reqstr *thrift.Tip) {
 	v.Add("nsp_ts", strconv.FormatInt(time.Now().Unix(), 10))
 	idtys, err := json.Marshal(&ids)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	v.Add("device_token_list", string(idtys))
@@ -184,14 +192,14 @@ func (p *Pusher) normal(ids []string, reqstr *thrift.Tip) {
 
 	ploadtys, err := json.Marshal(&payload)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	v.Add("payload", string(ploadtys))
 	req, err := http.NewRequest("POST", p.pushurl,
 		strings.NewReader(v.Encode()))
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	p.httpsend(req)
@@ -199,7 +207,7 @@ func (p *Pusher) normal(ids []string, reqstr *thrift.Tip) {
 
 func (p *Pusher) notifyPush(mt *bmess.Mt) {
 	if mt.Ids == nil || len(mt.Ids) < 1 || len(mt.Ids[0]) < 1 {
-		log.Error("ids 为空")
+		log.Log.Error("ids 为空")
 		return
 	}
 	if p.tokenExpiredTime.IsZero() ||
@@ -228,7 +236,7 @@ func (p *Pusher) Start() {
 		case <-bmess.Quit:
 			return
 		case mess := <-p.msch:
-			log.Info("pmess-appid:", p.appid)
+			log.Log.Info("huawei-appid:", p.appid)
 			if mess.Ptype == 1 {
 				go p.notifyPush(mess)
 			}

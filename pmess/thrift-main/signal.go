@@ -5,8 +5,10 @@
 package main
 
 import (
+	"jspring.top/pushmess/log"
 	"os"
 	"os/signal"
+	"syscall"
 )
 
 // interruptChannel is used to receive SIGINT (Ctrl+C) signals.
@@ -24,7 +26,7 @@ var simulateInterruptChannel = make(chan struct{}, 1)
 
 // signals defines the signals that are handled to do a clean shutdown.
 // Conditional compilation is used to also include SIGTERM on Unix.
-var signals = []os.Signal{os.Interrupt}
+var signals = []os.Signal{os.Interrupt, syscall.SIGTERM}
 
 // SimulateInterrupt requests invoking the clean termination process by an
 // internal component instead of a SIGINT.
@@ -54,11 +56,11 @@ func mainInterruptHandler() {
 	for {
 		select {
 		case sig := <-interruptChannel:
-			log.Infof("Received signal (%s).  Shutting down...", sig)
+			log.Log.Infof("Received signal (%s).  Shutting down...", sig)
 			invokeCallbacks()
 			return
 		case <-simulateInterruptChannel:
-			log.Info("Received shutdown request.  Shutting down...")
+			log.Log.Info("Received shutdown request.  Shutting down...")
 			invokeCallbacks()
 			return
 

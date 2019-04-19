@@ -4,6 +4,7 @@ import (
 	"jspring.top/pushmess/bmess"
 	"jspring.top/pushmess/getui"
 	"jspring.top/pushmess/huawei"
+	"jspring.top/pushmess/log"
 	"jspring.top/pushmess/thrift"
 )
 
@@ -39,7 +40,7 @@ func sendMess(oids []*thrift.Devcid, ptype int32, reqstr *thrift.Tip) {
 			v := &bmess.Mt{Ptype: ptype, Reqstr: reqstr, Ids: vs}
 			p.Trans(v)
 		} else {
-			log.Error("orgin:", k, " 不存在")
+			log.Log.Error("orgin:", k, " 不存在")
 		}
 	}
 

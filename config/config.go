@@ -13,6 +13,7 @@ import (
 	"fmt"
 	flags "github.com/jessevdk/go-flags"
 	"io/ioutil"
+	"jspring.top/pushmess/log"
 	"math/big"
 	"net"
 	"os"
@@ -70,7 +71,7 @@ func LoadConfig() {
 		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
 			preParser.WriteHelp(os.Stderr)
 		}
-		log.Fatalln(err)
+		log.Log.Fatalln(err)
 	}
 	// Load additional config from file.
 	configFilePath := conf.ConfigFile.Value
@@ -83,7 +84,7 @@ func LoadConfig() {
 		if _, ok := err.(*os.PathError); !ok {
 			parser.WriteHelp(os.Stderr)
 		}
-		log.Fatalln(err)
+		log.Log.Fatalln(err)
 	}
 
 	// Parse command line options again to ensure they take precedence.
@@ -92,18 +93,18 @@ func LoadConfig() {
 		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
 			parser.WriteHelp(os.Stderr)
 		}
-		log.Fatalln(err)
+		log.Log.Fatalln(err)
 	}
 
 	// keyPair, err := OpenRPCKeyPair("./pushmess.key",
 	// 	"./pushmess.cert", false, "pushmess")
 	// if err != nil {
-	// 	log.Fatalln("证书读取或创建失败")
+	// 	log.Log.Fatalln("证书读取或创建失败")
 	// }
 	// conf.KeyPair = keyPair
 
 	if conf.Listen == "" {
-		log.Fatalln("listens获取失败")
+		log.Log.Fatalln("listens获取失败")
 	}
 	Cfg = conf
 }
@@ -205,7 +206,7 @@ func OpenRPCKeyPair(rpckey, rpccert string, onetime bool, org string) (tls.Certi
 // possibly also the key in PEM format to the paths specified by the config.  If
 // successful, the new keypair is returned.
 func generateRPCKeyPair(rpckey, rpccert string, writeKey bool, org string) (tls.Certificate, error) {
-	log.Infof("Generating TLS certificates...")
+	log.Log.Infof("Generating TLS certificates...")
 
 	// Create directories for cert and key files if they do not yet exist.
 	certDir, _ := filepath.Split(rpccert)
@@ -239,14 +240,14 @@ func generateRPCKeyPair(rpckey, rpccert string, writeKey bool, org string) (tls.
 		if err != nil {
 			rmErr := os.Remove(rpccert)
 			if rmErr != nil {
-				log.Warnf("Cannot remove written certificates: %v",
+				log.Log.Warnf("Cannot remove written certificates: %v",
 					rmErr)
 			}
 			return tls.Certificate{}, err
 		}
 	}
 
-	log.Info("Done generating TLS certificates")
+	log.Log.Info("Done generating TLS certificates")
 	return keyPair, nil
 }
 

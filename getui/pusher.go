@@ -2,10 +2,12 @@ package getui
 
 import (
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"jspring.top/pushmess/bmess"
 	"jspring.top/pushmess/config"
+	"jspring.top/pushmess/log"
 	"jspring.top/pushmess/thrift"
 	"net/http"
 	"strconv"
@@ -47,7 +49,7 @@ func Use() bmess.PushHandle {
 		mastersecret: config.Cfg.GetuiAppms,
 		msch:         make(chan *bmess.Mt, 10),
 	}
-	log.Info("getui is started.")
+	log.Log.Info("getui is started.")
 	return pusher
 }
 
@@ -62,20 +64,23 @@ func (p *Pusher) pushauth() {
 	ctx["appkey"] = p.appkey
 	ctxstr, err := json.Marshal(ctx)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	req, err := http.NewRequest("POST", p.pushurl+"v1/"+p.appid+"/auth_sign", strings.NewReader(string(ctxstr)))
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	defer resp.Body.Close()
@@ -88,7 +93,7 @@ func (p *Pusher) pushauth() {
 		}
 		if err != nil {
 			if err.Error() != "EOF" {
-				log.Error(err)
+				log.Log.Error(err)
 			}
 			break
 		}
@@ -96,11 +101,12 @@ func (p *Pusher) pushauth() {
 	ret := make(map[string]string)
 	err = json.Unmarshal(resb, &ret)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	if ret["result"] == "ok" {
 		p.authtoken = ret["auth_token"]
+		log.Log.Info("getui-token:", p.authtoken)
 	} else if ret["result"] == "" {
 		return
 	} else {
@@ -127,10 +133,13 @@ func (p *Pusher) aus() {
 func (p *Pusher) httpsend(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("authtoken", p.authtoken)
-	client := &http.Client{}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	defer resp.Body.Close()
@@ -143,7 +152,7 @@ func (p *Pusher) httpsend(req *http.Request) {
 		}
 		if err != nil {
 			if err.Error() != "EOF" {
-				log.Error(err)
+				log.Log.Error(err)
 			}
 			break
 		}
@@ -151,14 +160,14 @@ func (p *Pusher) httpsend(req *http.Request) {
 	ret := make(map[string]string)
 	err = json.Unmarshal(resb, &ret)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	if ret["result"] == "" {
-		log.Error("无返回")
+		log.Log.Error("无返回")
 	} else {
-		log.Info("result:", ret["result"], " ;taskid:", ret["taskid"])
-		log.Info("status:", ret["status"], " ;desc:", ret["desc"])
+		log.Log.Info("result:", ret["result"], " ;taskid:", ret["taskid"])
+		log.Log.Info("status:", ret["status"], " ;desc:", ret["desc"])
 	}
 }
 
@@ -184,13 +193,13 @@ func (p *Pusher) single(id string, reqstr *thrift.Tip) {
 		strconv.FormatInt(atomic.AddInt64(&p.reqid, 1), 16)
 	ctxstr, err := json.Marshal(ctx)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	req, err := http.NewRequest("POST", p.pushurl+"v1/"+p.appid+"/push_single",
 		strings.NewReader(string(ctxstr)))
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	p.httpsend(req)
@@ -213,7 +222,7 @@ func (p *Pusher) list(ids []string, reqstr string) {
 	reqjson := make(map[string]string)
 	err := json.Unmarshal([]byte(reqstr), &reqjson)
 	if err != nil {
-		log.Error("参数格式错误")
+		log.Log.Error("参数格式错误")
 		return
 	}
 	notification["transmission_content"] = reqjson["appcontent"]
@@ -223,21 +232,24 @@ func (p *Pusher) list(ids []string, reqstr string) {
 	ctx["notification"] = notification
 	ctxstr, err := json.Marshal(ctx)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	req, err := http.NewRequest("POST", p.pushurl+"v1/"+p.appid+"/save_list_body",
 		strings.NewReader(string(ctxstr)))
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("authtoken", p.authtoken)
-	client := &http.Client{}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	defer resp.Body.Close()
@@ -250,7 +262,7 @@ func (p *Pusher) list(ids []string, reqstr string) {
 		}
 		if err != nil {
 			if err.Error() != "EOF" {
-				log.Error(err)
+				log.Log.Error(err)
 			}
 			break
 		}
@@ -258,15 +270,15 @@ func (p *Pusher) list(ids []string, reqstr string) {
 	ret := make(map[string]string)
 	err = json.Unmarshal(resb, &ret)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	if ret["result"] != "ok" {
-		log.Error("list error:", ret["result"])
+		log.Log.Error("list error:", ret["result"])
 		return
 	}
 	if ret["taskid"] == "" {
-		log.Error("taskid error:", ret["desc"])
+		log.Log.Error("taskid error:", ret["desc"])
 		return
 	}
 	ctx = map[string]interface{}{
@@ -276,13 +288,13 @@ func (p *Pusher) list(ids []string, reqstr string) {
 	}
 	ctxstr, err = json.Marshal(ctx)
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	req, err = http.NewRequest("POST", p.pushurl+"v1/"+p.appid+"/push_list",
 		strings.NewReader(string(ctxstr)))
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 		return
 	}
 	p.httpsend(req)
@@ -290,7 +302,7 @@ func (p *Pusher) list(ids []string, reqstr string) {
 
 func (p *Pusher) notifyPush(mt *bmess.Mt) {
 	if mt.Ids == nil || len(mt.Ids) < 1 || len(mt.Ids[0]) < 1 {
-		log.Error("ids 为空")
+		log.Log.Error("ids 为空")
 		return
 	}
 	for _, v := range mt.Ids {
@@ -307,11 +319,11 @@ func (p *Pusher) Start() {
 		case <-bmess.Quit:
 			return
 		case mess := <-p.msch:
-			log.Info("pmess-appid:", p.appid)
-			// log.Info("mess-m:", mess.m)
+			log.Log.Info("getui-appid:", p.appid)
+			// log.Log.Info("mess-m:", mess.m)
 			if len(p.authtoken) < 1 {
 				auch <- struct{}{}
-				log.Error("push fail:authtoken is null")
+				log.Log.Error("push fail:authtoken is null")
 			}
 			if mess.Ptype == 1 {
 				go p.notifyPush(mess)

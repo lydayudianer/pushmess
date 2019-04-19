@@ -3,6 +3,7 @@ package pmess
 import (
 	"context"
 	"github.com/apache/thrift/lib/go/thrift"
+	"jspring.top/pushmess/log"
 	th "jspring.top/pushmess/thrift"
 	"testing"
 )
@@ -11,18 +12,18 @@ func TestGetuiPush(t *testing.T) {
 
 	transport, err := thrift.NewTSocket("localhost:9000")
 	if err != nil {
-		log.Fatal("Error opening socket:", err)
+		log.Log.Fatal("Error opening socket:", err)
 
 	}
 	protocolFactory := thrift.NewTCompactProtocolFactory()
 	transportFactory := thrift.NewTBufferedTransportFactory(8192)
 	tspt, err := transportFactory.GetTransport(transport)
 	if err != nil {
-		log.Fatal(err)
+		log.Log.Fatal(err)
 	}
 	defer tspt.Close()
 	if err := tspt.Open(); err != nil {
-		log.Fatal(err)
+		log.Log.Fatal(err)
 	}
 	client := th.NewPmessServiceClientFactory(tspt, protocolFactory)
 	ctx := context.Background()
@@ -39,10 +40,10 @@ func TestGetuiPush(t *testing.T) {
 	// 	Reqstr: "{\"appcontent\":\"透传内容\",\"text\":\"测试push\",\"title\":\"测试标题\"}",
 	// })
 	if err != nil {
-		log.Error(err)
+		log.Log.Error(err)
 	}
 
-	log.Info("end:")
+	log.Log.Info("end:")
 }
 
 /**
